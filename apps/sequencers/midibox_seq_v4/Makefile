@@ -14,7 +14,8 @@ LCD       =     $(MIOS32_LCD)
 # Source Files, include paths and libraries
 ################################################################################
 
-THUMB_SOURCE    = core/app.c \
+THUMB_SOURCE    = core/seq_mod.c \
+		core/app.c \
 		mios32/tasks.c \
 		core/seq_hwcfg.c  \
 		core/seq_ui.c  \

@@ -10,10 +10,102 @@
 #ifndef _MIOS32_CONFIG_H
 #define _MIOS32_CONFIG_H
 
+#define SEQ_USE_MOD
+
+#define MIOS32_DONT_USE_BLM
+#define SEQ_DONT_USE_BLM8X8
+
 // V4+ switch depends on used processor
 #if defined(MIOS32_FAMILY_STM32F4xx)
 # define MBSEQV4P
 #endif
+
+#define MIOS32_SRIO_SPI   0
+#define MIOS32_SDCARD_SPI 1
+
+#define MIOS32_IIC_NUM 2
+#define MIOS32_IIC0_ENABLED 0
+#define MIOS32_IIC1_ENABLED 1
+#define MIOS32_IIC1_BUS_FREQUENCY 100000
+
+#define MIOS32_IIC1_SCL_PORT    GPIOB
+#define MIOS32_IIC1_SCL_PIN     GPIO_Pin_8
+#define MIOS32_IIC1_SCL_AF      { GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_I2C1); }
+#define MIOS32_IIC1_SDA_PORT    GPIOB
+#define MIOS32_IIC1_SDA_PIN     GPIO_Pin_9
+#define MIOS32_IIC1_SDA_AF      { GPIO_PinAFConfig(GPIOB, GPIO_PinSource9, GPIO_AF_I2C1); }
+
+#define MIOS32_IIC_IO_PORT 1
+#define MIOS32_IIC_IO_BASE_ADDRESS 0x20U
+#define MIOS32_IIC_IO_BOARDS 4
+#define MIOS32_IIC_IO_ROWS_PER_BOARD 4
+
+
+#define MIOS32_DONT_USE_OSC
+#define MIOS32_DONT_USE_AIN
+#define MIOS32_DONT_USE_COM
+#define MIOS32_DONT_USE_MF
+#define MIOS32_DONT_USE_IIC_MIDI
+#define MIOS32_DONT_USE_UART
+#define MIOS32_DONT_USE_UART_MIDI
+//#define MIOS32_DONT_USE_IIC
+#define MIOS32_DONT_USE_IIC_MIDI
+#define MIOS32_DONT_USE_SPI_MIDI
+#define MIOS32_DONT_USE_ENC28J60
+#define MIOS32_DONT_USE_AOUT
+#define MIOS32_DONT_USE_SRIO_SCAN
+#define MIOS32_DONT_USE_BOARD_J5
+#define MIOS32_DONT_USE_BOARD_J10
+#define MIOS32_DONT_USE_BOARD_J28
+#define MIOS32_DONT_USE_BOARD_J15
+#define MIOS32_DONT_USE_BOARD_DAC
+#define MIOS32_DONT_USE_BOARD_LED
+
+#define MIOS32_DONT_USE_SPI2
+#define MIOS32_DONT_USE_MF
+#define MIOS32_DONT_USE_IIC_BS
+
+#define MIOS32_DONT_USE_DIN
+
+
+#define MIOS32_CLCD_PARALLEL_DISPLAYS 4
+
+#define MIOS32_CLCD_PARALLEL_LCD0_RS_PORT GPIOD
+#define MIOS32_CLCD_PARALLEL_LCD0_RS_PIN GPIO_Pin_4
+#define MIOS32_CLCD_PARALLEL_LCD0_RW_PORT GPIOD
+#define MIOS32_CLCD_PARALLEL_LCD0_RW_PIN GPIO_Pin_7
+#define MIOS32_CLCD_PARALLEL_LCD0_E_PORT GPIOD
+#define MIOS32_CLCD_PARALLEL_LCD0_E_PIN GPIO_Pin_3
+#define MIOS32_CLCD_PARALLEL_LCD0_DATA_PORT GPIOD
+#define MIOS32_CLCD_PARALLEL_LCD0_DATA_PINS_OFFSET 8U
+
+#define MIOS32_CLCD_PARALLEL_LCD1_RS_PORT GPIOA
+#define MIOS32_CLCD_PARALLEL_LCD1_RS_PIN GPIO_Pin_13
+#define MIOS32_CLCD_PARALLEL_LCD1_RW_PORT GPIOA
+#define MIOS32_CLCD_PARALLEL_LCD1_RW_PIN GPIO_Pin_14
+#define MIOS32_CLCD_PARALLEL_LCD1_E_PORT GPIOA
+#define MIOS32_CLCD_PARALLEL_LCD1_E_PIN GPIO_Pin_15
+#define MIOS32_CLCD_PARALLEL_LCD1_DATA_PORT GPIOB
+#define MIOS32_CLCD_PARALLEL_LCD1_DATA_PINS_OFFSET 0U
+
+#define MIOS32_CLCD_PARALLEL_LCD2_RS_PORT GPIOC
+#define MIOS32_CLCD_PARALLEL_LCD2_RS_PIN GPIO_Pin_0
+#define MIOS32_CLCD_PARALLEL_LCD2_RW_PORT GPIOC
+#define MIOS32_CLCD_PARALLEL_LCD2_RW_PIN GPIO_Pin_2
+#define MIOS32_CLCD_PARALLEL_LCD2_E_PORT GPIOC
+#define MIOS32_CLCD_PARALLEL_LCD2_E_PIN GPIO_Pin_3
+#define MIOS32_CLCD_PARALLEL_LCD2_DATA_PORT GPIOE
+#define MIOS32_CLCD_PARALLEL_LCD2_DATA_PINS_OFFSET 0U
+
+#define MIOS32_CLCD_PARALLEL_LCD3_RS_PORT GPIOC
+#define MIOS32_CLCD_PARALLEL_LCD3_RS_PIN GPIO_Pin_13
+#define MIOS32_CLCD_PARALLEL_LCD3_RW_PORT GPIOA
+#define MIOS32_CLCD_PARALLEL_LCD3_RW_PIN GPIO_Pin_3
+#define MIOS32_CLCD_PARALLEL_LCD3_E_PORT GPIOA
+#define MIOS32_CLCD_PARALLEL_LCD3_E_PIN GPIO_Pin_6
+#define MIOS32_CLCD_PARALLEL_LCD3_DATA_PORT GPIOE
+#define MIOS32_CLCD_PARALLEL_LCD3_DATA_PINS_OFFSET 8U
+
 
 
 // The boot message which is print during startup and returned on a SysEx query
@@ -24,7 +116,7 @@
 #else
 #define MIOS32_LCD_BOOT_MSG_LINE1 "MIDIbox SEQ V4.096"
 #endif
-#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2020 T. Klose"
+#define MIOS32_LCD_BOOT_MSG_LINE2 "(C) 2019 T. Klose"
 
 // USB settings
 #ifdef MBSEQV4P
@@ -57,14 +149,13 @@ extern void APP_SendDebugMessage(char *format, ...);
 # define UIP_TASK_STACK_SIZE               2100
 # define MIOS32_TASK_MIDI_HOOKS_STACK_SIZE 2100
 # define MIDI_TASK_STACK_SIZE              2100
-# define PERIOD1MS_TASK_STACK_SIZE         2100
 #else
 # define MIOS32_TASK_HOOKS_STACK_SIZE      1000
 # define UIP_TASK_STACK_SIZE               1000
 # define MIOS32_TASK_MIDI_HOOKS_STACK_SIZE 1400
 # define MIDI_TASK_STACK_SIZE              1400
-# define PERIOD1MS_TASK_STACK_SIZE         1400
 #endif
+#define PERIOD1MS_TASK_STACK_SIZE          1400
 #define PERIOD1MS_LOWPRIO_TASK_STACK_SIZE  1400
 
 // only used by idle task
@@ -76,7 +167,7 @@ extern void APP_SendDebugMessage(char *format, ...);
 
 // reserved memory for FreeRTOS pvPortMalloc function
 #ifdef MBSEQV4P
-# define MIOS32_HEAP_SIZE 20*1024
+# define MIOS32_HEAP_SIZE 18*1024
 #else
 # define MIOS32_HEAP_SIZE 13*1024
 #endif
@@ -90,7 +181,7 @@ extern void APP_SendDebugMessage(char *format, ...);
 
 
 // increased number of SRs (MBSEQ uses 16 SRs by default, but it's possible to increase the number in MBSEQ_HW.V4)
-#define MIOS32_SRIO_NUM_SR 23
+#define MIOS32_SRIO_NUM_SR 28
 
 // to save some RAM (only 128 bytes, but "Kleinvieh macht auch Mist" - especially for LPC17)
 #define MIOS32_ENC_NUM_MAX 32
@@ -162,6 +253,7 @@ extern void APP_SendDebugMessage(char *format, ...);
 #define MIOS32_IIC_MIDI7_ENABLED    1
 
 
+/*
 // configure BLM driver
 #define BLM_DOUT_L1_SR	255 // dummy, will be changed in seq_file_hw.c
 #define BLM_DOUT_R1_SR	255 // dummy, will be changed in seq_file_hw.c
@@ -177,6 +269,7 @@ extern void APP_SendDebugMessage(char *format, ...);
 #define BLM_NUM_COLOURS 2
 #define BLM_NUM_ROWS    8
 #define BLM_DEBOUNCE_MODE 1
+*/
 
 
 // configure BLM_X driver
@@ -202,7 +295,7 @@ extern void APP_SendDebugMessage(char *format, ...);
 #endif
 
 // BLM_SCALAR master driver: enable this switch if the application supports OSC (based on osc_server module)
-#define BLM_SCALAR_MASTER_OSC_SUPPORT 1
+#define BLM_SCALAR_MASTER_OSC_SUPPORT 0
 
 // map MIDI mutex to BLM_SCALAR master
 // located in tasks.c to access MIDI IN/OUT mutex from external
@@ -214,7 +307,7 @@ extern void TASKS_MUTEX_MIDIOUT_Give(void);
 
 // optional for Francois' 4 * 20x2 LCD configuration
 // currently this option cannot be enabled in the MBSEQ_HW.V4 file - this will be possible later
-#if 0
+#if 1
 #define LCD_NUM_DEVICES          4
 #define LCD_COLUMNS_PER_DEVICE  20
 #define MIOS32_BOARD_LCD_E3_PORT GPIOB       // J15C.A10
