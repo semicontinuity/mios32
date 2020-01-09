@@ -102,21 +102,41 @@ void APP_Background(void)
 }
 
 
-/////////////////////////////////////////////////////////////////////////////
-// This hook is called when a MIDI package has been received
-/////////////////////////////////////////////////////////////////////////////
-void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_package)
-{
-  // control the Duo-LEDs via Note On/Off Events
-  // The colour is controlled with velocity value:
-  // 0x00:       both LEDs off
-  // 0x01..0x3f: green LED on
-  // 0x40..0x5f: red LED on
-  // 0x60..0x7f: both LEDs on
+void update_led_data(mios32_midi_package_t midi_package, u8 velocity, u8 led_mod_ix, u8 led_row_ix, u8 led_column_ix) {
+    u8 led_mask = 1U << led_column_ix;
 
-  // MIDI event assignments: see README.txt
+    // 90 xx 00 is the same like a note off event!
+// (-> http://www.borg.com/~jglatt/tech/midispec.htm)
+    if (midi_package.event == NoteOff || velocity == 0x00) {
+        // Note Off or velocity == 0x00: clear both LEDs
+        blm_scalar_led[led_mod_ix][led_row_ix][0] &= ~led_mask;
+#if BLM_SCALAR_NUM_COLOURS >= 2
+        blm_scalar_led[led_mod_ix][led_row_ix][1] &= ~led_mask;
+#endif
+    } else if (velocity < 0x40) {
+        // Velocity < 0x40: set green LED, clear red LED
+        blm_scalar_led[led_mod_ix][led_row_ix][0] |= led_mask;
+#if BLM_SCALAR_NUM_COLOURS >= 2
+        blm_scalar_led[led_mod_ix][led_row_ix][1] &= ~led_mask;
+#endif
+    } else if (velocity < 0x60) {
+        // Velocity < 0x60: clear green LED, set red LED
+        blm_scalar_led[led_mod_ix][led_row_ix][0] &= ~led_mask;
+#if BLM_SCALAR_NUM_COLOURS >= 2
+        blm_scalar_led[led_mod_ix][led_row_ix][1] |= led_mask;
+#endif
+    } else {
+        // Velocity >= 0x60: set both LEDs
+        blm_scalar_led[led_mod_ix][led_row_ix][0] |= led_mask;
+#if BLM_SCALAR_NUM_COLOURS >= 2
+        blm_scalar_led[led_mod_ix][led_row_ix][1] |= led_mask;
+#endif
+    }
+}
 
-  if( midi_package.event == NoteOff || midi_package.event == NoteOn ) {
+
+// MIDI event assignments: see README.txt
+static void handle_single_led_change_event(mios32_midi_package_t midi_package) {
     u8 chn = midi_package.chn;
     u8 note = midi_package.note;
     u8 velocity = midi_package.velocity;
@@ -141,7 +161,7 @@ void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_
     } else if( chn == 0 && note >= 0x60 && note <= 0x6f ) {
       // extra row LEDs
       led_mod_ix = 4;
-      led_row_ix = 1 + ((note >> 1) & 6);
+      led_row_ix = 1 + ((note >> 1U) & 6);
       led_column_ix = note & 3;
       modify_led = 1;
     } else if( chn == 0xf && note >= 0x60 && note <= 0x6f ) {
@@ -152,176 +172,288 @@ void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_
       modify_led = 1;
     }
 
-
     if( modify_led ) {
-      u8 led_mask = 1 << led_column_ix;
-
-      // 90 xx 00 is the same like a note off event!
-      // (-> http://www.borg.com/~jglatt/tech/midispec.htm)
-      if( midi_package.event == NoteOff || velocity == 0x00 ) {
-	// Note Off or velocity == 0x00: clear both LEDs
-	blm_scalar_led[led_mod_ix][led_row_ix][0] &= ~led_mask;
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	blm_scalar_led[led_mod_ix][led_row_ix][1] &= ~led_mask;
-#endif
-      } else if( velocity < 0x40 ) {
-	// Velocity < 0x40: set green LED, clear red LED
-	blm_scalar_led[led_mod_ix][led_row_ix][0] |= led_mask;
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	blm_scalar_led[led_mod_ix][led_row_ix][1] &= ~led_mask;
-#endif
-      } else if( velocity < 0x60 ) {
-	// Velocity < 0x60: clear green LED, set red LED
-	blm_scalar_led[led_mod_ix][led_row_ix][0] &= ~led_mask;
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	blm_scalar_led[led_mod_ix][led_row_ix][1] |= led_mask;
-#endif
-      } else {
-	// Velocity >= 0x60: set both LEDs
-	blm_scalar_led[led_mod_ix][led_row_ix][0] |= led_mask;
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	blm_scalar_led[led_mod_ix][led_row_ix][1] |= led_mask;
-#endif
-      }
-
-      notifyDataReceived();
+        update_led_data(midi_package, velocity, led_mod_ix, led_row_ix, led_column_ix);
+        notifyDataReceived();
     }
-  }
+}
 
-  // "check for packed format" which is transfered via CCs
-  else if( midi_package.event == CC ) {
+
+static void update_green_leds_in_column(u8 column, u8 is_second_half, u8 pattern) {
+    u8 mod = is_second_half ? 2U : 0;
+    u8 offset = column >> 3;
+    u8 mask = 1 << (column & 7);
+    if (pattern & 0x01) { blm_scalar_led[mod + 0][offset + 0][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 0][0] &= ~mask;
+    }
+    if (pattern & 0x02) { blm_scalar_led[mod + 0][offset + 2][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 2][0] &= ~mask;
+    }
+    if (pattern & 0x04) { blm_scalar_led[mod + 0][offset + 4][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 4][0] &= ~mask;
+    }
+    if (pattern & 0x08) { blm_scalar_led[mod + 0][offset + 6][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 6][0] &= ~mask;
+    }
+    if (pattern & 0x10) { blm_scalar_led[mod + 1][offset + 0][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 0][0] &= ~mask;
+    }
+    if (pattern & 0x20) { blm_scalar_led[mod + 1][offset + 2][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 2][0] &= ~mask;
+    }
+    if (pattern & 0x40) { blm_scalar_led[mod + 1][offset + 4][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 4][0] &= ~mask;
+    }
+    if (pattern & 0x80) { blm_scalar_led[mod + 1][offset + 6][0] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 6][0] &= ~mask;
+    }
+}
+
+
+static void update_red_leds_in_column(u8 column, u8 is_second_half, u8 pattern) {
+#if BLM_SCALAR_NUM_COLOURS >= 2
+    u8 mod = is_second_half ? 2U : 0;
+    u8 offset = column >> 3;
+    u8 mask = 1 << (column & 7);
+    if (pattern & 0x01) { blm_scalar_led[mod + 0][offset + 0][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 0][1] &= ~mask;
+    }
+    if (pattern & 0x02) { blm_scalar_led[mod + 0][offset + 2][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 2][1] &= ~mask;
+    }
+    if (pattern & 0x04) { blm_scalar_led[mod + 0][offset + 4][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 4][1] &= ~mask;
+    }
+    if (pattern & 0x08) { blm_scalar_led[mod + 0][offset + 6][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 0][offset + 6][1] &= ~mask;
+    }
+    if (pattern & 0x10) { blm_scalar_led[mod + 1][offset + 0][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 0][1] &= ~mask;
+    }
+    if (pattern & 0x20) { blm_scalar_led[mod + 1][offset + 2][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 2][1] &= ~mask;
+    }
+    if (pattern & 0x40) { blm_scalar_led[mod + 1][offset + 4][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 4][1] &= ~mask;
+    }
+    if (pattern & 0x80) { blm_scalar_led[mod + 1][offset + 6][1] |= mask; }
+    else {
+        blm_scalar_led[mod + 1][offset + 6][1] &= ~mask;
+    }
+#endif
+}
+
+
+static void update_left_half_of_green_leds_in_row(u8 row, u8 pattern) {
+    blm_scalar_led[row >> 2U][((row & 3U) << 1U) + 0][0] = pattern;
+}
+
+
+static void update_right_half_of_green_leds_in_row(u8 row, u8 pattern) {
+    blm_scalar_led[row >> 2U][((row & 3U) << 1U) + 1][0] = pattern;
+}
+
+
+static void update_left_half_of_red_leds_in_row(u8 row, u8 pattern) {
+    blm_scalar_led[row >> 2U][((row & 3U) << 1U) + 0][1] = pattern;
+}
+
+
+static void update_right_half_of_red_leds_in_row(u8 row, u8 pattern) {
+    blm_scalar_led[row >> 2U][((row & 3U) << 1U) + 1][1] = pattern;
+}
+
+
+static void update_green_leds_in_extra_column(u8 is_second_half, u8 pattern) {
+    int mod = 4;
+    // Bit  0 -> led_row_ix 0x0, Bit 0
+    // Bit  1 -> led_row_ix 0x2, Bit 0
+    // Bit  2 -> led_row_ix 0x4, Bit 0
+    // Bit  3 -> led_row_ix 0x6, Bit 0
+    // Bit  4 -> led_row_ix 0x0, Bit 1
+    // Bit  5 -> led_row_ix 0x2, Bit 1
+    // Bit  6 -> led_row_ix 0x4, Bit 1
+    // Bit  7 -> led_row_ix 0x6, Bit 1
+    // Bit  8 -> led_row_ix 0x0, Bit 2
+    // Bit  9 -> led_row_ix 0x2, Bit 2
+    // Bit 10 -> led_row_ix 0x4, Bit 2
+    // Bit 11 -> led_row_ix 0x6, Bit 2
+    // Bit 12 -> led_row_ix 0x0, Bit 3
+    // Bit 13 -> led_row_ix 0x2, Bit 3
+    // Bit 14 -> led_row_ix 0x4, Bit 3
+    // Bit 15 -> led_row_ix 0x6, Bit 3
+    if (is_second_half) {
+        blm_scalar_led[mod][0][0] =
+                (blm_scalar_led[mod][0][0] & 0xf3) | ((pattern << 2) & 0x04) | ((pattern >> 1) & 0x08);
+        blm_scalar_led[mod][2][0] =
+                (blm_scalar_led[mod][2][0] & 0xf3) | ((pattern << 1) & 0x04) | ((pattern >> 2) & 0x08);
+        blm_scalar_led[mod][4][0] =
+                (blm_scalar_led[mod][4][0] & 0xf3) | ((pattern << 0) & 0x04) | ((pattern >> 3) & 0x08);
+        blm_scalar_led[mod][6][0] =
+                (blm_scalar_led[mod][6][0] & 0xf3) | ((pattern >> 1) & 0x04) | ((pattern >> 4) & 0x08);
+    } else {
+        blm_scalar_led[mod][0][0] =
+                (blm_scalar_led[mod][0][0] & 0xfc) | ((pattern >> 0) & 0x01) | ((pattern >> 3) & 0x02);
+        blm_scalar_led[mod][2][0] =
+                (blm_scalar_led[mod][2][0] & 0xfc) | ((pattern >> 1) & 0x01) | ((pattern >> 4) & 0x02);
+        blm_scalar_led[mod][4][0] =
+                (blm_scalar_led[mod][4][0] & 0xfc) | ((pattern >> 2) & 0x01) | ((pattern >> 5) & 0x02);
+        blm_scalar_led[mod][6][0] =
+                (blm_scalar_led[mod][6][0] & 0xfc) | ((pattern >> 3) & 0x01) | ((pattern >> 6) & 0x02);
+    }
+}
+
+
+static void update_red_leds_in_extra_column(u8 is_second_half, u8 pattern) {
+    int mod = 4;
+    if (is_second_half) {
+        blm_scalar_led[mod][0][1] =
+                (blm_scalar_led[mod][0][1] & 0xf3) | ((pattern << 2) & 0x04) | ((pattern >> 1) & 0x08);
+        blm_scalar_led[mod][2][1] =
+                (blm_scalar_led[mod][2][1] & 0xf3) | ((pattern << 1) & 0x04) | ((pattern >> 2) & 0x08);
+        blm_scalar_led[mod][4][1] =
+                (blm_scalar_led[mod][4][1] & 0xf3) | ((pattern << 0) & 0x04) | ((pattern >> 3) & 0x08);
+        blm_scalar_led[mod][6][1] =
+                (blm_scalar_led[mod][6][1] & 0xf3) | ((pattern >> 1) & 0x04) | ((pattern >> 4) & 0x08);
+    } else {
+        blm_scalar_led[mod][0][1] =
+                (blm_scalar_led[mod][0][1] & 0xfc) | ((pattern >> 0) & 0x01) | ((pattern >> 3) & 0x02);
+        blm_scalar_led[mod][2][1] =
+                (blm_scalar_led[mod][2][1] & 0xfc) | ((pattern >> 1) & 0x01) | ((pattern >> 4) & 0x02);
+        blm_scalar_led[mod][4][1] =
+                (blm_scalar_led[mod][4][1] & 0xfc) | ((pattern >> 2) & 0x01) | ((pattern >> 5) & 0x02);
+        blm_scalar_led[mod][6][1] =
+                (blm_scalar_led[mod][6][1] & 0xfc) | ((pattern >> 3) & 0x01) | ((pattern >> 6) & 0x02);
+    }
+}
+
+
+static void update_green_leds_in_extra_row(u8 chn, u8 is_second_half, u8 pattern) {
+    u8 mod = 4;
+    u8 led_row_ix = is_second_half ? 5 : 1;
+    if (chn == 0) {
+        blm_scalar_led[mod][led_row_ix + 0][0] =
+                (blm_scalar_led[mod][led_row_ix + 0][0] & 0xf0) | (pattern & 0x0f);
+        blm_scalar_led[mod][led_row_ix + 2][0] =
+                (blm_scalar_led[mod][led_row_ix + 2][0] & 0xf0) | (pattern >> 4);
+    } else if (chn == 15) {
+        blm_scalar_led[mod][led_row_ix + 0][0] =
+                (blm_scalar_led[mod][led_row_ix + 0][0] & 0x0f) | (pattern << 4);
+        blm_scalar_led[mod][led_row_ix + 2][0] =
+                (blm_scalar_led[mod][led_row_ix + 2][0] & 0x0f) | (pattern & 0xf0);
+    }
+}
+
+
+static void update_red_leds_in_extra_row(u8 chn, u8 is_second_half, u8 pattern) {
+#if BLM_SCALAR_NUM_COLOURS >= 2
+    u8 mod = 4;
+    u8 led_row_ix = is_second_half ? 5 : 1;
+    if (chn == 0) {
+        blm_scalar_led[mod][led_row_ix + 0][1] =
+                (blm_scalar_led[mod][led_row_ix + 0][1] & 0xf0) | (pattern & 0x0f);
+        blm_scalar_led[mod][led_row_ix + 2][1] =
+                (blm_scalar_led[mod][led_row_ix + 2][1] & 0xf0) | (pattern >> 4);
+    } else if (chn == 15) {
+        blm_scalar_led[mod][led_row_ix + 0][1] =
+                (blm_scalar_led[mod][led_row_ix + 0][1] & 0x0f) | (pattern << 4);
+        blm_scalar_led[mod][led_row_ix + 2][1] =
+                (blm_scalar_led[mod][led_row_ix + 2][1] & 0x0f) | (pattern & 0xf0);
+    }
+#endif
+}
+
+
+static void handle_packed_leds_change_event(mios32_midi_package_t midi_package) {
     u8 chn = midi_package.chn;
     u8 cc_number = midi_package.cc_number;
     u8 pattern = midi_package.value;
 
-    if( cc_number & 0x01 )
-      pattern |= (1 << 7);
+    if (cc_number & 0x01U)   // means that 8th LED is on
+        pattern |= (1U << 7U);
 
-    switch( cc_number & 0xfe ) {
-      case 0x10: blm_scalar_led[chn>>2][((chn&3)<<1) + 0][0] = pattern; break;
-      case 0x12: blm_scalar_led[chn>>2][((chn&3)<<1) + 1][0] = pattern; break;
-
-      case 0x18:
-      case 0x1a: {
-	u8 mod = (cc_number & 0x02) ? 2 : 0;
-	u8 offset = chn >> 3;
-	u8 mask = 1 << (chn&7);
-	if( pattern & 0x01 ) { blm_scalar_led[mod+0][offset+0][0] |= mask; } else { blm_scalar_led[mod+0][offset+0][0] &= ~mask; }
-	if( pattern & 0x02 ) { blm_scalar_led[mod+0][offset+2][0] |= mask; } else { blm_scalar_led[mod+0][offset+2][0] &= ~mask; }
-	if( pattern & 0x04 ) { blm_scalar_led[mod+0][offset+4][0] |= mask; } else { blm_scalar_led[mod+0][offset+4][0] &= ~mask; }
-	if( pattern & 0x08 ) { blm_scalar_led[mod+0][offset+6][0] |= mask; } else { blm_scalar_led[mod+0][offset+6][0] &= ~mask; }
-	if( pattern & 0x10 ) { blm_scalar_led[mod+1][offset+0][0] |= mask; } else { blm_scalar_led[mod+1][offset+0][0] &= ~mask; }
-	if( pattern & 0x20 ) { blm_scalar_led[mod+1][offset+2][0] |= mask; } else { blm_scalar_led[mod+1][offset+2][0] &= ~mask; }
-	if( pattern & 0x40 ) { blm_scalar_led[mod+1][offset+4][0] |= mask; } else { blm_scalar_led[mod+1][offset+4][0] &= ~mask; }
-	if( pattern & 0x80 ) { blm_scalar_led[mod+1][offset+6][0] |= mask; } else { blm_scalar_led[mod+1][offset+6][0] &= ~mask; }
-      } break;
-
-      case 0x20: blm_scalar_led[chn>>2][((chn&3)<<1) + 0][1] = pattern; break;
-      case 0x22: blm_scalar_led[chn>>2][((chn&3)<<1) + 1][1] = pattern; break;
-
-      case 0x28:
-      case 0x2a: {
+    switch (cc_number & 0xfeU) {
+        case 0x10:
+            update_left_half_of_green_leds_in_row(chn, pattern);
+            break;
+        case 0x12:
+            update_right_half_of_green_leds_in_row(chn, pattern);
+            break;
+        case 0x18:
+        case 0x1a:
+            update_green_leds_in_column(chn, cc_number & 0x02U, pattern);
+            break;
+        case 0x20:
+            update_left_half_of_red_leds_in_row(chn, pattern);
+            break;
+        case 0x22:
+            update_right_half_of_red_leds_in_row(chn, pattern);
+            break;
+        case 0x28:
+        case 0x2a:
+            update_red_leds_in_column(chn, cc_number & 0x02U, pattern);
+            break;
+        case 0x40:
+        case 0x42:
+            if (chn == 0) {
+                update_green_leds_in_extra_column(cc_number >= 0x42, pattern);
+            }
+            break;
+        case 0x48:
+        case 0x4a:
 #if BLM_SCALAR_NUM_COLOURS >= 2
-	u8 mod = (cc_number & 0x02) ? 2 : 0;
-	u8 offset = chn >> 3;
-	u8 mask = 1 << (chn&7);
-	if( pattern & 0x01 ) { blm_scalar_led[mod+0][offset+0][1] |= mask; } else { blm_scalar_led[mod+0][offset+0][1] &= ~mask; }
-	if( pattern & 0x02 ) { blm_scalar_led[mod+0][offset+2][1] |= mask; } else { blm_scalar_led[mod+0][offset+2][1] &= ~mask; }
-	if( pattern & 0x04 ) { blm_scalar_led[mod+0][offset+4][1] |= mask; } else { blm_scalar_led[mod+0][offset+4][1] &= ~mask; }
-	if( pattern & 0x08 ) { blm_scalar_led[mod+0][offset+6][1] |= mask; } else { blm_scalar_led[mod+0][offset+6][1] &= ~mask; }
-	if( pattern & 0x10 ) { blm_scalar_led[mod+1][offset+0][1] |= mask; } else { blm_scalar_led[mod+1][offset+0][1] &= ~mask; }
-	if( pattern & 0x20 ) { blm_scalar_led[mod+1][offset+2][1] |= mask; } else { blm_scalar_led[mod+1][offset+2][1] &= ~mask; }
-	if( pattern & 0x40 ) { blm_scalar_led[mod+1][offset+4][1] |= mask; } else { blm_scalar_led[mod+1][offset+4][1] &= ~mask; }
-	if( pattern & 0x80 ) { blm_scalar_led[mod+1][offset+6][1] |= mask; } else { blm_scalar_led[mod+1][offset+6][1] &= ~mask; }
+            if (chn == 0) {
+                update_red_leds_in_extra_column(cc_number >= 0x4a, pattern);
+            }
 #endif
-      } break;
+            break;
+        case 0x60:
+        case 0x62:
+            update_green_leds_in_extra_row(chn, cc_number >= 0x62, pattern);
+            break;
 
-      case 0x40: 
-      case 0x42: {
-	if( chn == 0 ) {
-	  int mod = 4;
-	  // Bit  0 -> led_row_ix 0x0, Bit 0
-	  // Bit  1 -> led_row_ix 0x2, Bit 0
-	  // Bit  2 -> led_row_ix 0x4, Bit 0
-	  // Bit  3 -> led_row_ix 0x6, Bit 0
-	  // Bit  4 -> led_row_ix 0x0, Bit 1
-	  // Bit  5 -> led_row_ix 0x2, Bit 1
-	  // Bit  6 -> led_row_ix 0x4, Bit 1
-	  // Bit  7 -> led_row_ix 0x6, Bit 1
-	  // Bit  8 -> led_row_ix 0x0, Bit 2
-	  // Bit  9 -> led_row_ix 0x2, Bit 2
-	  // Bit 10 -> led_row_ix 0x4, Bit 2
-	  // Bit 11 -> led_row_ix 0x6, Bit 2
-	  // Bit 12 -> led_row_ix 0x0, Bit 3
-	  // Bit 13 -> led_row_ix 0x2, Bit 3
-	  // Bit 14 -> led_row_ix 0x4, Bit 3
-	  // Bit 15 -> led_row_ix 0x6, Bit 3
-	  if( cc_number >= 0x42 ) {
-	    blm_scalar_led[mod][0][0] = (blm_scalar_led[mod][0][0] & 0xf3) | ((pattern << 2) & 0x04) | ((pattern >> 1) & 0x08);
-	    blm_scalar_led[mod][2][0] = (blm_scalar_led[mod][2][0] & 0xf3) | ((pattern << 1) & 0x04) | ((pattern >> 2) & 0x08);
-	    blm_scalar_led[mod][4][0] = (blm_scalar_led[mod][4][0] & 0xf3) | ((pattern << 0) & 0x04) | ((pattern >> 3) & 0x08);
-	    blm_scalar_led[mod][6][0] = (blm_scalar_led[mod][6][0] & 0xf3) | ((pattern >> 1) & 0x04) | ((pattern >> 4) & 0x08);
-	  } else {
-	    blm_scalar_led[mod][0][0] = (blm_scalar_led[mod][0][0] & 0xfc) | ((pattern >> 0) & 0x01) | ((pattern >> 3) & 0x02);
-	    blm_scalar_led[mod][2][0] = (blm_scalar_led[mod][2][0] & 0xfc) | ((pattern >> 1) & 0x01) | ((pattern >> 4) & 0x02);
-	    blm_scalar_led[mod][4][0] = (blm_scalar_led[mod][4][0] & 0xfc) | ((pattern >> 2) & 0x01) | ((pattern >> 5) & 0x02);
-	    blm_scalar_led[mod][6][0] = (blm_scalar_led[mod][6][0] & 0xfc) | ((pattern >> 3) & 0x01) | ((pattern >> 6) & 0x02);
-	  }
-	}
-      } break;
-
-      case 0x48: 
-      case 0x4a: {
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	if( chn == 0 ) {
-	  int mod = 4;
-	  if( cc_number >= 0x4a ) {
-	    blm_scalar_led[mod][0][1] = (blm_scalar_led[mod][0][1] & 0xf3) | ((pattern << 2) & 0x04) | ((pattern >> 1) & 0x08);
-	    blm_scalar_led[mod][2][1] = (blm_scalar_led[mod][2][1] & 0xf3) | ((pattern << 1) & 0x04) | ((pattern >> 2) & 0x08);
-	    blm_scalar_led[mod][4][1] = (blm_scalar_led[mod][4][1] & 0xf3) | ((pattern << 0) & 0x04) | ((pattern >> 3) & 0x08);
-	    blm_scalar_led[mod][6][1] = (blm_scalar_led[mod][6][1] & 0xf3) | ((pattern >> 1) & 0x04) | ((pattern >> 4) & 0x08);
-	  } else {
-	    blm_scalar_led[mod][0][1] = (blm_scalar_led[mod][0][1] & 0xfc) | ((pattern >> 0) & 0x01) | ((pattern >> 3) & 0x02);
-	    blm_scalar_led[mod][2][1] = (blm_scalar_led[mod][2][1] & 0xfc) | ((pattern >> 1) & 0x01) | ((pattern >> 4) & 0x02);
-	    blm_scalar_led[mod][4][1] = (blm_scalar_led[mod][4][1] & 0xfc) | ((pattern >> 2) & 0x01) | ((pattern >> 5) & 0x02);
-	    blm_scalar_led[mod][6][1] = (blm_scalar_led[mod][6][1] & 0xfc) | ((pattern >> 3) & 0x01) | ((pattern >> 6) & 0x02);
-	  }
-	}
-#endif
-      } break;
-
-
-      case 0x60: 
-      case 0x62: {
-	u8 mod = 4;
-	u8 led_row_ix = (cc_number >= 0x62) ? 5 : 1;
-	if( chn == 0 ) {
-	  blm_scalar_led[mod][led_row_ix+0][0] = (blm_scalar_led[mod][led_row_ix+0][0] & 0xf0) | (pattern & 0x0f);
-	  blm_scalar_led[mod][led_row_ix+2][0] = (blm_scalar_led[mod][led_row_ix+2][0] & 0xf0) | (pattern >> 4);
-	} else if( chn == 15 ) {
-	  blm_scalar_led[mod][led_row_ix+0][0] = (blm_scalar_led[mod][led_row_ix+0][0] & 0x0f) | (pattern << 4);
-	  blm_scalar_led[mod][led_row_ix+2][0] = (blm_scalar_led[mod][led_row_ix+2][0] & 0x0f) | (pattern & 0xf0);
-	}
-      } break;
-
-      case 0x68: 
-      case 0x6a: {
-#if BLM_SCALAR_NUM_COLOURS >= 2
-	u8 mod = 4;
-	u8 led_row_ix = (cc_number >= 0x6a) ? 5 : 1;
-	if( chn == 0 ) {
-	  blm_scalar_led[mod][led_row_ix+0][1] = (blm_scalar_led[mod][led_row_ix+0][1] & 0xf0) | (pattern & 0x0f);
-	  blm_scalar_led[mod][led_row_ix+2][1] = (blm_scalar_led[mod][led_row_ix+2][1] & 0xf0) | (pattern >> 4);
-	} else if( chn == 15 ) {
-	  blm_scalar_led[mod][led_row_ix+0][1] = (blm_scalar_led[mod][led_row_ix+0][1] & 0x0f) | (pattern << 4);
-	  blm_scalar_led[mod][led_row_ix+2][1] = (blm_scalar_led[mod][led_row_ix+2][1] & 0x0f) | (pattern & 0xf0);
-	}
-#endif
-      } break;
+        case 0x68:
+        case 0x6a:
+            update_red_leds_in_extra_row(chn, cc_number >= 0x6a, pattern);
+            break;
     }
 
     notifyDataReceived();
-  }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// This hook is called when a MIDI package has been received
+/////////////////////////////////////////////////////////////////////////////
+void APP_MIDI_NotifyPackage(mios32_midi_port_t port, mios32_midi_package_t midi_package) {
+    if (midi_package.event == NoteOff || midi_package.event == NoteOn) {
+        // control the Duo-LEDs via Note On/Off Events
+        // The colour is controlled with velocity value:
+        // 0x00:       both LEDs off
+        // 0x01..0x3f: green LED on
+        // 0x40..0x5f: red LED on
+        // 0x60..0x7f: both LEDs on
+        handle_single_led_change_event(midi_package);
+    }
+    else if (midi_package.event == CC) {
+        // "check for packed format" which is transfered via CCs
+        handle_packed_leds_change_event(midi_package);
+    }
 }
 
 
