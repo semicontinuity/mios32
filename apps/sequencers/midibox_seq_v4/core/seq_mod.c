@@ -61,13 +61,13 @@ s32 i2c_transfer(u8 port, u8 iic_addr, u8 *buffer, size_t size, mios32_iic_trans
 }
 
 
-void receive(int board) {
+void receive0(u8 board, u8 iic_addr) {
     uint8_t event;
     s32 status = -1;
     while (status < 0) {
         if ((status = i2c_transfer(
                 MIOS32_IIC_IO_PORT,
-                (MIOS32_IIC_IO_BASE_ADDRESS + board) << 1,
+                iic_addr << 1U,
                 (u8 *) &event,
                 sizeof(event),
                 IIC_Read)) >= 0)
@@ -97,15 +97,23 @@ void receive(int board) {
     }
 }
 
+void receive(int board) {
+    receive0(board, (MIOS32_IIC_IO_BASE_ADDRESS + board));
+}
 
-void send(u8 board) {
+
+void send0(u8 board, u8 iic_addr) {
     volatile u8 *buffer = (volatile u8 *) &mios32_srio_dout[0][0] + MIOS32_SRIO_NUM_SR - 16;
     i2c_transfer(
             MIOS32_IIC_IO_PORT,
-            (MIOS32_IIC_IO_BASE_ADDRESS + board) << 1,
+            iic_addr << 1U,
             buffer + (board * MIOS32_IIC_IO_ROWS_PER_BOARD),
             MIOS32_IIC_IO_ROWS_PER_BOARD,
             IIC_Write);
+}
+
+void send(u8 board) {
+    send0(board, MIOS32_IIC_IO_BASE_ADDRESS + board);
 }
 
 
