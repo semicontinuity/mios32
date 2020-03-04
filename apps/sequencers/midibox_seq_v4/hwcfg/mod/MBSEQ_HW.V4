@@ -1,6 +1,5 @@
 ##################################################
-# Setup File for midiphy right handed JA Frontpanel
-# $Id: MBSEQ_HW.V4 2542 2017-11-04 22:41:11Z tk $
+# Setup File for midiphy-mod Frontpanel
 ##################################################
 
 
@@ -123,13 +122,13 @@ LED_MIDI_OUT_COMBINED 0   0
 
 #           SR  Pin
 LED_EDIT     4   7
-LED_MUTE    10   0
+LED_MUTE    17   4
 LED_PATTERN  3   7
 LED_SONG     2   7
-LED_PHRASE   9   0
+LED_PHRASE  17   3
 
 #           SR  Pin
-LED_SOLO     0   1
+LED_SOLO    19   3
 LED_FAST    11   7
 LED_FAST2    9   7
 LED_ALL     10   7
@@ -146,25 +145,25 @@ LED_TRG_LAYER_B   0   0
 LED_TRG_LAYER_C   0   0
 
 #          SR  Pin
-LED_PLAY    5   0
-LED_STOP    6   0
-LED_PAUSE   4   0
-LED_REW     8   0
-LED_FWD     7   0
-LED_LOOP    3   0
+LED_PLAY    20  6
+LED_STOP    20  5
+LED_PAUSE   20  2
+LED_REW     20  3
+LED_FWD     20  4
+LED_LOOP    19  5
 LED_FOLLOW  0   0
 
 #              SR  Pin
 LED_EXIT       6  7
 LED_SELECT     0  1
 LED_MENU       5  7
-LED_BOOKMARK   16 0
+LED_BOOKMARK  18  6
 LED_SCRUB      0  1
-LED_METRONOME  0  1
-LED_RECORD     2  0
+LED_METRONOME 19  4
+LED_RECORD    19  6
 LED_JAM_LIVE   0  1
 LED_JAM_STEP   0  1
-LED_LIVE       1  0
+LED_LIVE      19  2
 LED_UTILITY    1  7
 LED_COPY      16  7
 LED_PASTE     15  7
@@ -174,11 +173,11 @@ LED_MOVE      13  7
 LED_SCROLL    12  7
 
 #                  SR  Pin
-LED_STEP_VIEW       15  0
-LED_PAR_LAYER_SEL   13  0
-LED_TRG_LAYER_SEL   12  0
-LED_INS_SEL         11  0
-LED_TRACK_SEL       14  0
+LED_STEP_VIEW       18  5
+LED_PAR_LAYER_SEL   18  3
+LED_TRG_LAYER_SEL   17  6
+LED_INS_SEL         17  5
+LED_TRACK_SEL       18  4
 
 #                  SR  Pin
 LED_TAP_TEMPO       0   0
@@ -229,18 +228,18 @@ BUTTON_RIGHT  7   3
 
 #                SR  Pin
 BUTTON_SCRUB      0   0
-BUTTON_METRONOME M3C  1
+BUTTON_METRONOME 18   3
 BUTTON_TAP_TEMPO  0   0
 BUTTON_JAM_LIVE   0   0
 BUTTON_JAM_STEP   0   0
 
 #             SR  Pin
-BUTTON_STOP    6   0
-BUTTON_PAUSE   4   0
-BUTTON_PLAY    5   0
-BUTTON_REW     8   0
-BUTTON_FWD     7   0
-BUTTON_LOOP    3  1
+BUTTON_STOP    17  2
+BUTTON_PAUSE   17  5
+BUTTON_PLAY    17  1
+BUTTON_REW     17  4
+BUTTON_FWD     17  3
+BUTTON_LOOP    18  2
 BUTTON_FOLLOW  0   0
 
 #              SR  Pin
@@ -261,13 +260,13 @@ BUTTON_PAR_LAYER_C  0   0
 
 #               SR  Pin
 BUTTON_EDIT      4   3
-BUTTON_MUTE     10   0
+BUTTON_MUTE     20   3
 BUTTON_PATTERN   3   3
 BUTTON_SONG      2   3
-BUTTON_PHRASE    9   0
+BUTTON_PHRASE   20   4
 
 #            SR  Pin
-BUTTON_SOLO   0  0
+BUTTON_SOLO  18  4
 BUTTON_FAST  11  3
 #BUTTON_FAST2  9  3
 BUTTON_ALL   10  3
@@ -304,7 +303,7 @@ BUTTON_DIRECT_TRACK1  16   2
 BUTTON_DIRECT_TRACK2  15   2
 BUTTON_DIRECT_TRACK3  14   2
 BUTTON_DIRECT_TRACK4  13   2
-BUTTON_DIRECT_TRACK5  12️  2
+BUTTON_DIRECT_TRACK5  12   2
 BUTTON_DIRECT_TRACK6  11   2
 BUTTON_DIRECT_TRACK7  10   2
 BUTTON_DIRECT_TRACK8   9   2
@@ -323,15 +322,15 @@ BUTTON_TRG_LAYER_B   0   0
 BUTTON_TRG_LAYER_C   0   0
 
 #                    SR  Pin
-BUTTON_TRACK_SEL     14   0
-BUTTON_LIVE          1    0
-BUTTON_RECORD        2    0
+BUTTON_TRACK_SEL     19   3
+BUTTON_LIVE          18   5
+BUTTON_RECORD        18   1
 BUTTON_SAVE_ALL      0    0
 
 #                    SR  Pin
-BUTTON_PAR_LAYER_SEL 13   0
-BUTTON_TRG_LAYER_SEL 12   0
-BUTTON_INS_SEL       11   0
+BUTTON_PAR_LAYER_SEL 19   4
+BUTTON_TRG_LAYER_SEL 20   1
+BUTTON_INS_SEL       20   2
 
 #               SR  Pin
 BUTTON_UTILITY   1   3
@@ -341,10 +340,10 @@ BUTTON_CLEAR    14   3
 BUTTON_UNDO      0   0
 BUTTON_MOVE     13   3
 BUTTON_SCROLL   12   3
-BUTTON_BOOKMARK 16   0
+BUTTON_BOOKMARK 19   1
 
 #                 SR  Pin
-BUTTON_STEP_VIEW  15  0
+BUTTON_STEP_VIEW  19  2
 
 #                 SR  Pin
 BUTTON_EXT_RESTART 0   0
