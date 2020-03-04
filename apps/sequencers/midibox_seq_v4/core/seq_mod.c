@@ -4,9 +4,9 @@
 // SRIO 4-7:    Board @I2C 0x22
 // SRIO 8-11:   Board @I2C 0x21
 // SRIO 12-15:  Board @I2C 0x20 (leftmost)
-// SRIO 16-19:  Board @I2C 0x30 (keypad)
-// SRIO 20-23:  Virtual SRIO for GP keys (R Color 1, L Color 1, R Color 2, L Color 2)
-// SRIO 24-27:  Virtual SRIO for TRACK keys (R Color 1, L Color 1, R Color 2, L Color 2)
+// SRIO 16-19:  Board @I2C 0x08 (keypad)
+// SRIO 20-23:  Virtual SRIO for GP LEDs (R Color 1, L Color 1, R Color 2, L Color 2)
+// SRIO 24-27:  Virtual SRIO for TRACK LEDs (R Color 1, L Color 1, R Color 2, L Color 2)
 #include <mios32.h>
 
 // this module can be optionally disabled in a local mios32_config.h file (included from mios32.h)
@@ -34,7 +34,7 @@ void handle_encoder_event(u8 encoder_index, s8 delta) {
     int prev_reported_value = encoder_reported_value[encoder_index];
     if (new_reported_value != prev_reported_value) {
         // GP encoders are 1..16
-        APP_ENC_NotifyChange(encoder_index + 1, new_reported_value - prev_reported_value);
+        APP_ENC_NotifyChange(encoder_index, new_reported_value - prev_reported_value);
         encoder_reported_value[encoder_index] = new_reported_value;
     }
     encoder_value[encoder_index] = new_value;
@@ -61,7 +61,12 @@ s32 i2c_transfer(u8 port, u8 iic_addr, u8 *buffer, size_t size, mios32_iic_trans
 }
 
 
-void receive0(u8 board, u8 iic_addr) {
+/**
+ * Receive events from the board.
+ * @param base_sr base SR for the board; because of strange addressing, corresponds to rightmost column of the board.
+ * @return received event (0 = no event)
+ */
+u8 receive0(u8 iic_addr) {
     uint8_t event;
     s32 status = -1;
     while (status < 0) {
@@ -72,48 +77,70 @@ void receive0(u8 board, u8 iic_addr) {
                 sizeof(event),
                 IIC_Read)) >= 0)
         {
-            // event is 0 when nothing has happened
-            if (event != 0) {
-                if (event & 0x80U) {
-                    // button event
-                    u8 pressed = event & 1U;    // bug in firmware, Pressed was supposed to have lower bit set to 0
-                    u8 button = (event & 0x7FU) >> 1U;
-                    u8 column = button >> 2U;
-                    u8 row = button & 3U;
-                    u32 sr = 16 - 1 - ((board << 2U) + column);
-                    u32 pin = (sr << 3U) | row;
-                    APP_DIN_NotifyToggle(pin,pressed ? 0 : 1);
-                } else {
-                    // encoder event
-                    u8 delta_bits = (event & 0x1FU);
-                    u8 encoder = event >> 5U;
-                    s8 delta = delta_bits < 16 ? delta_bits : delta_bits - 32;
-                    handle_encoder_event((board << 2U) + encoder, delta);
-                }
-            }
+            return event;
         } else {
             MIOS32_MIDI_SendDebugMessage("WARNING: Could not receive via I2C.\n");
         }
     }
-}
-
-void receive(int board) {
-    receive0(board, (MIOS32_IIC_IO_BASE_ADDRESS + board));
+    return 0;
 }
 
 
-void send0(u8 board, u8 iic_addr) {
-    volatile u8 *buffer = (volatile u8 *) &mios32_srio_dout[0][0] + MIOS32_SRIO_NUM_SR - 16;
+void receive_and_handle_v1(u8 iic_addr, u8 base_sr, u8 base_encoder) {
+    u8 event = receive0(iic_addr);
+    // event is 0 when nothing has happened
+    if (event != 0) {
+        if (event & 0x80U) {
+            // button event
+            u8 pressed = event & 1U;    // bug in firmware, Pressed was supposed to have lower bit set to 0
+            u8 button = (event & 0x7FU) >> 1U;
+            u8 column = button >> 2U;
+            u8 row = button & 3U;
+            u32 sr = base_sr + 3 - column;
+            u32 pin = (sr << 3U) | row;
+            APP_DIN_NotifyToggle(pin, pressed ? 0 : 1);
+        } else {
+            // encoder event
+            u8 delta_bits = (event & 0x1FU);
+            u8 encoder = event >> 5U;
+            s8 delta = delta_bits < 16 ? delta_bits : delta_bits - 32;
+            handle_encoder_event(base_encoder + encoder, delta);
+        }
+    }
+}
+
+void receive_and_handle_v2(u8 iic_addr, u8 base_sr, u8 base_encoder) {
+    u8 event = receive0(iic_addr);
+    // event is 0 when nothing has happened
+    if (event != 0) {
+        if (event & 0x80U) {
+            // button event
+            u8 depressed = event & 1U;
+            u8 button = (event & 0x7FU) >> 1U;
+            u8 column = button >> 3U;
+            u8 row = button & 0b00000111U;
+            u32 sr = base_sr + column;  // Take care of SR reversal!
+            u32 pin = (sr << 3U) | row;
+            APP_DIN_NotifyToggle(pin, depressed);
+        } else {
+            // encoder event
+            u8 delta_bits = (event & 0x1FU);
+            u8 encoder = event >> 5U;   // 2 bits for encoder number, highest bit is 0
+            s8 delta = delta_bits < 16 ? delta_bits : delta_bits - 32;
+            handle_encoder_event(base_encoder + encoder, delta);
+        }
+    }
+}
+
+
+void send0(u8 iic_addr, u8 base_sr) {
+    volatile u8 *buffer = (volatile u8 *) (&mios32_srio_dout[0][0] + MIOS32_SRIO_NUM_SR - 4 - base_sr);
     i2c_transfer(
             MIOS32_IIC_IO_PORT,
             iic_addr << 1U,
-            buffer + (board * MIOS32_IIC_IO_ROWS_PER_BOARD),
+            buffer,
             MIOS32_IIC_IO_ROWS_PER_BOARD,
             IIC_Write);
-}
-
-void send(u8 board) {
-    send0(board, MIOS32_IIC_IO_BASE_ADDRESS + board);
 }
 
 
@@ -162,14 +189,18 @@ static void TASK_CommunicateWithHIDBoards(void *pvParameters)  {
     // Initialise the xLastExecutionTime variable on task entry
     xLastExecutionTime = xTaskGetTickCount();
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
     while(1)  {
         vTaskDelayUntil(&xLastExecutionTime, 10 / portTICK_RATE_MS);
 
-        receive(0);
-        receive(1);
-        receive(2);
-        receive(3);
+        receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 0), 12, 1);
+        receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 1), 8, 5);
+        receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 2), 4, 9);
+        receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 3), 0, 13);
+        receive_and_handle_v2(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16, 0);
 
+        // Copy bits from "virtual" SRIO for TRACK and GP LEDs into "real" SRIO
         // Bits: 0=round buttons; 2,3,4=Tracks B,G,R; 5,6,7=GP B,G,R
         transpose(20, 0, 6);
         transpose(21, 8, 6);
@@ -180,11 +211,13 @@ static void TASK_CommunicateWithHIDBoards(void *pvParameters)  {
         transpose(26, 0, 2);
         transpose(27, 8, 2);
 
-        send(0);
-        send(1);
-        send(2);
-        send(3);
+        send0(MIOS32_IIC_IO_BASE_ADDRESS + 0, 12);
+        send0(MIOS32_IIC_IO_BASE_ADDRESS + 1, 8);
+        send0(MIOS32_IIC_IO_BASE_ADDRESS + 2, 4);
+        send0(MIOS32_IIC_IO_BASE_ADDRESS + 3, 0);
+        send0(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16);
     }
+#pragma clang diagnostic pop
 }
 
 
