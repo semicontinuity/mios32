@@ -7,6 +7,9 @@
 // SRIO 16-19:  Board @I2C 0x08 (keypad)
 // SRIO 20-23:  Virtual SRIO for GP LEDs (R Color 1, L Color 1, R Color 2, L Color 2)
 // SRIO 24-27:  Virtual SRIO for TRACK LEDs (R Color 1, L Color 1, R Color 2, L Color 2)
+//
+// (see GP_DOUT_L_SR, GP_DOUT_R_SR, GP_DOUT_L2_SR, GP_DOUT_R2_SR, TRACKS_DOUT_L_SR, TRACKS_DOUT_R_SR in config file)
+// (see SEQ_LED_NUM_SR, which must correspond to actual number of SRs)
 #include <mios32.h>
 
 // this module can be optionally disabled in a local mios32_config.h file (included from mios32.h)
@@ -198,7 +201,9 @@ static void TASK_CommunicateWithHIDBoards(void *pvParameters)  {
         receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 1), 8, 5);
         receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 2), 4, 9);
         receive_and_handle_v1((MIOS32_IIC_IO_BASE_ADDRESS + 3), 0, 13);
-        receive_and_handle_v2(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16, 0);
+        if (seq_hwcfg_blm.enabled) {
+            receive_and_handle_v2(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16, 0);
+        }
 
         // Copy bits from "virtual" SRIO for TRACK and GP LEDs into "real" SRIO
         // Bits: 0=round buttons; 2,3,4=Tracks B,G,R; 5,6,7=GP B,G,R
@@ -215,7 +220,9 @@ static void TASK_CommunicateWithHIDBoards(void *pvParameters)  {
         send0(MIOS32_IIC_IO_BASE_ADDRESS + 1, 8);
         send0(MIOS32_IIC_IO_BASE_ADDRESS + 2, 4);
         send0(MIOS32_IIC_IO_BASE_ADDRESS + 3, 0);
-        send0(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16);
+        if (seq_hwcfg_blm.enabled) {
+            send0(MIOS32_IIC_IO_KEYPAD_ADDRESS, 16);
+        }
     }
 #pragma clang diagnostic pop
 }

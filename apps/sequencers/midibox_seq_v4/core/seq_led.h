@@ -19,7 +19,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 // number of SRs: 23 supported by MIOS32_DOUT
-#define SEQ_LED_NUM_SR 23
+#define SEQ_LED_NUM_SR 28
 // (8 additional SRs are mapped to BLM8x8, and configured with SR M1..M8)
 
 

@@ -77,6 +77,9 @@
 
 #define MIOS32_DONT_USE_DIN
 
+// SEQ_HWCFG_Init called unconditionally
+//#define MIOS32_DONT_USE_ENC
+
 
 #define MIOS32_CLCD_PARALLEL_DISPLAYS 4
 
